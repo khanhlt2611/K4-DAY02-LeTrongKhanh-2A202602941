@@ -12,3 +12,8 @@ __pycache__/
 .ipynb_checkpoints/
 runs/
 eval_out/
+!submissions/2A202602941_LeTrongKhanh/eval_out/
+!submissions/2A202602941_LeTrongKhanh/eval_out/**
+lab_day2_output/
+.tmp_finalize/
+*.inspect.ndjson

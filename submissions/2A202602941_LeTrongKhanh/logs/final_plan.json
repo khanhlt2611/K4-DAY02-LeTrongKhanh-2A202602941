@@ -1,0 +1,49 @@
+{
+  "config": {
+    "exp_id": "F01",
+    "seed": 0,
+    "fold": 0,
+    "backbone": "convnext_tiny",
+    "init": "finetune",
+    "drop_rate": 0.0,
+    "img_size": 224,
+    "aug": "basic",
+    "sampler": null,
+    "mix": null,
+    "mix_alpha": 1.0,
+    "loss": "ce",
+    "label_smoothing": 0.0,
+    "focal_gamma": 2.0,
+    "class_weight_beta": null,
+    "epochs": 12,
+    "batch_size": 64,
+    "lr_backbone": 0.0001,
+    "lr_head": 0.0001,
+    "weight_decay": 0.05,
+    "warmup_epochs": 1.0,
+    "ema_decay": null,
+    "amp": true,
+    "num_workers": 2,
+    "images_dir": "/tmp/lab_day2_runtime/data",
+    "labels_dir": "/tmp/lab_day2_runtime/data/labels",
+    "out_dir": "/kaggle/working/lab_day2_output/runs",
+    "pred_dir": "/kaggle/working/lab_day2_output/predictions",
+    "save_test_predictions": false
+  },
+  "method": {
+    "exp_id": "I02scale",
+    "mode": "scale",
+    "K": 3,
+    "sizes": [
+      224,
+      256,
+      288
+    ]
+  },
+  "partner": "/kaggle/working/lab_day2_output/runs/B04/seed0/best.pt",
+  "seeds": [
+    0,
+    1,
+    2
+  ]
+}
