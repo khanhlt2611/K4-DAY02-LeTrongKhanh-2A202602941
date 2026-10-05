@@ -38,7 +38,17 @@ def build_model(name: str, pretrained: bool = True, num_classes: int = 9,
       - nếu init == "frozen": gọi freeze_backbone(model)
       - ghi lại tên tag trọng số thực sự được tải (model.pretrained_cfg)
     """
-    raise NotImplementedError("TODO")
+    import timm
+    if init not in ("scratch", "frozen", "finetune"):
+        raise ValueError(f"init không hợp lệ: {init}")
+    net = timm.create_model(SUGGESTED_BACKBONES.get(name, name),
+                            pretrained=pretrained and init != "scratch",
+                            num_classes=num_classes, drop_rate=drop_rate)
+    net.lab_init = init
+    net.lab_pretrained = pretrained and init != "scratch"
+    if init == "frozen":
+        freeze_backbone(net)
+    return net
 
 
 def freeze_backbone(model) -> None:
@@ -49,7 +59,13 @@ def freeze_backbone(model) -> None:
       - lưu ý (GUIDE.md mục 3.2): backbone đóng băng thì BatchNorm cũng phải ở chế độ eval.
         Hãy nghĩ nơi nào trong train loop phải gọi lại model.train() mà vẫn giữ BN ở eval.
     """
-    raise NotImplementedError("TODO")
+    for p in model.parameters():
+        p.requires_grad_(False)
+    for p in model.get_classifier().parameters():
+        p.requires_grad_(True)
+    model.eval()
+    model.get_classifier().train()
+    model.lab_init = "frozen"
 
 
 def param_groups(model, lr_backbone: float, lr_head: float, weight_decay: float):
@@ -64,12 +80,20 @@ def param_groups(model, lr_backbone: float, lr_head: float, weight_decay: float)
       - trả về list[dict] dạng {"params": [...], "lr": ..., "weight_decay": ...}
       - (trục E) mở rộng: LR theo tầng nếu bạn muốn thử
     """
-    raise NotImplementedError("TODO")
+    head_ids = {id(p) for p in model.get_classifier().parameters()}
+    groups = [dict(params=[], lr=lr_backbone, weight_decay=weight_decay),
+              dict(params=[], lr=lr_backbone, weight_decay=0.0),
+              dict(params=[], lr=lr_head, weight_decay=weight_decay)]
+    for p in model.parameters():
+        if p.requires_grad:
+            index = 2 if id(p) in head_ids else (0 if p.ndim > 1 else 1)
+            groups[index]["params"].append(p)
+    return groups
 
 
 def count_params(model) -> float:
     """Số tham số (triệu), đếm cả tham số bị đóng băng. TODO."""
-    raise NotImplementedError("TODO")
+    return sum(p.numel() for p in model.parameters()) / 1e6
 
 
 def count_gmacs(model, img_size: int = 224) -> float:
@@ -78,4 +102,16 @@ def count_gmacs(model, img_size: int = 224) -> float:
     TODO: dùng thư viện đếm (fvcore, ptflops, thop...) hoặc tự đếm bằng hook.
     Ghi rõ công cụ đã dùng; số có thể lệch vài phần trăm giữa các công cụ.
     """
-    raise NotImplementedError("TODO")
+    import copy
+    import torch
+    from torch.profiler import profile, ProfilerActivity
+    # PyTorch profiler: conv/matmul FLOPs / 2 = MACs. Không gồm phép elementwise/norm.
+    net = copy.deepcopy(model).cpu().float().eval()
+    # Tách SDPA thành matmul để profiler đếm cả attention của transformer.
+    for module in net.modules():
+        if hasattr(module, "fused_attn"):
+            module.fused_attn = False
+    x = torch.zeros(1, 3, img_size, img_size)
+    with torch.inference_mode(), profile(activities=[ProfilerActivity.CPU], with_flops=True) as prof:
+        net(x)
+    return sum(event.flops for event in prof.key_averages()) / 2e9
